@@ -1,0 +1,371 @@
+' =============================
+' Design studio.puml
+' =============================
+@startuml
+entity "Design" {
+  * id : UUID <<PK>>
+  --
+  name : String
+  description : String
+  ownerId : UUID
+  creationDate : Date
+  isPublic : boolean
+}
+
+entity "Layer" {
+  * id : UUID <<PK>>
+  --
+  designId : UUID <<FK>>
+  name : String
+  positionX : float
+  positionY : float
+  rotation : float
+  scale : float
+  zIndex : int
+  locked : boolean
+  type : String <<discriminator: Text, Image, Shape>>
+}
+
+entity "TextLayer" {
+  * layerId : UUID <<PK, FK>>
+  --
+  text : String
+  font : String
+  color : String
+  fontSize : float
+  alignment : String
+  bold : boolean
+  italic : boolean
+  underline : boolean
+}
+
+entity "ImageLayer" {
+  * layerId : UUID <<PK, FK>>
+  --
+  imageUrl : String
+  opacity : float
+  width : float
+  height : float
+  maintainAspectRatio : boolean
+}
+
+entity "ShapeLayer" {
+  * layerId : UUID <<PK, FK>>
+  --
+  shapeType : String
+  fillColor : String
+  borderColor : String
+  borderWidth : float
+  shapeId : String
+}
+
+entity "Template" {
+  * id : UUID <<PK>>
+  --
+  name : String
+  category : String
+  isPremium : boolean
+  designId : UUID <<FK>>
+}
+
+' Relaciones
+Design ||--o{ Layer : contains
+Layer ||--|| TextLayer
+Layer ||--|| ImageLayer
+Layer ||--|| ShapeLayer
+Template ||--|| Design : baseDesign
+
+' =============================
+' Order Fulfillment.puml
+' =============================
+
+
+entity "fulfillments" {
+  + id : UUID <<PK>>
+  --
+  order_id : UUID <<FK>> "references orders(id)"
+  status : ENUM('PENDING','IN_PRODUCTION','PACKED','SHIPPED','DELIVERED','CANCELED')
+  started_at : DATETIME
+  completed_at : DATETIME
+  is_canceled : BOOLEAN
+  shipped_at : DATETIME
+  packed_at : DATETIME
+  created_at : DATETIME
+  updated_at : DATETIME
+}
+
+entity "orders" {
+  + id : UUID <<PK>>
+  --
+  ' Add other fields as needed
+  created_at : DATETIME
+  updated_at : DATETIME
+  customer_id : UUID <<FK>> "references users(id)"
+  order_date : TIMESTAMP
+  status : ENUM('PENDING','PAID','CANCELLED','READY_FOR_PRODUCTION')
+}
+
+
+' Optional enhancement for tracking status transitions
+entity "fulfillment_status_history" {
+  + id : UUID <<PK>>
+  --
+  fulfillment_id : UUID <<FK>> "references fulfillments(id)"
+  old_status : VARCHAR
+  new_status : VARCHAR
+  changed_at : DATETIME
+}
+
+' Relationships
+fulfillments }|--|| orders : "belongs to"
+fulfillment_status_history }|--|| fulfillments : "logs changes in"
+
+' =============================
+' Order processing.puml
+' =============================
+
+
+entity "users" {
+  + id : UUID <<PK>>
+  --
+  full_name : VARCHAR(255)
+  email : VARCHAR(255) <<UNIQUE>> <<NOT NULL>>
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+  username : VARCHAR(50) <<UNIQUE>> <<NOT NULL>>
+  password_hash : VARCHAR(255) <<NOT NULL>>
+  password_salt : VARCHAR(100) <<NOT NULL>>
+  password_created_at : TIMESTAMP <<NOT NULL>>
+  password_expired : BOOLEAN <<DEFAULT false>>
+  last_login_at : TIMESTAMP
+
+}
+
+
+
+entity "order_items" {
+  + id : UUID <<PK>>
+  --
+  order_id : UUID <<FK>> "references orders(id)"
+  product_name : VARCHAR(255)
+  quantity : INTEGER
+  unit_price_amount : DECIMAL(19,4)
+  unit_price_currency : VARCHAR(3)
+  created_at : TIMESTAMP
+}
+
+entity "payments" {
+  + id : UUID <<PK>>
+  --
+  order_id : UUID <<FK>> <<UNIQUE>> "references orders(id)"
+  amount : DECIMAL(19,4)
+  currency : VARCHAR(3)
+  payment_method : VARCHAR(50)
+  status : ENUM('PENDING','COMPLETED','FAILED','REFUNDED')
+  processed_at : TIMESTAMP
+  refunded_at : TIMESTAMP
+  processor_reference : VARCHAR(255) <<UNIQUE>>
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+
+}
+
+' Relationships
+orders }|--|| users : "belongs to"
+orders ||--o{ order_items : "contains"
+orders ||--o| payments : "has"
+
+' =============================
+' Payment Gateway.puml
+' =============================
+
+
+entity "payment_events" {
+  + id : UUID <<PK>>
+  --
+  payment_id : UUID <<FK>> "references payments(id)"
+  event_type : VARCHAR(50)
+  timestamp : TIMESTAMP
+  details : TEXT
+  metadata : JSON
+}
+
+entity "invoices" {
+  + id : UUID <<PK>>
+  --
+  payment_id : UUID <<FK>> <<UNIQUE>> "references payments(id)"
+  invoice_number : VARCHAR(50) <<UNIQUE>>
+  issued_at : TIMESTAMP
+  due_date : TIMESTAMP
+  tax_amount : DECIMAL(19,4)
+  total_amount : DECIMAL(19,4)
+}
+
+entity "payment_retries" {
+  + id : UUID <<PK>>
+  --
+  payment_id : UUID <<FK>> "references payments(id)"
+  retry_count : INTEGER
+  next_retry_at : TIMESTAMP
+  max_retries : INTEGER
+  last_error : TEXT
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+
+' Relationships
+payments ||--o{ payment_events : "generates"
+payments ||--o| invoices : "billed to"
+payments ||--o{ payment_retries : "has retries"
+
+' =============================
+' Product Catalog.puml
+' =============================
+
+entity "products" {
+  + id : UUID <<PK>>
+  --
+  title : VARCHAR(255)
+  description : TEXT
+  price_amount : DECIMAL(19,4)
+  price_currency : VARCHAR(3)
+  rating_value : FLOAT
+  rating_max : INTEGER
+  preview_image_url : VARCHAR(512)
+  stock : INTEGER
+  is_active : BOOLEAN
+  category_id : UUID <<FK>>
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "categories" {
+  + id : UUID <<PK>>
+  --
+  name : VARCHAR(255)
+  description : TEXT
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "labels" {
+  + id : UUID <<PK>>
+  --
+  value : VARCHAR(100)
+  color_code : VARCHAR(7)
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "product_labels"  {
+  + product_id : UUID <<FK>>
+  + label_id : UUID <<FK>>
+  --
+  assigned_at : TIMESTAMP
+  <<PK>> (product_id, label_id)
+}
+
+' RELATIONSHIPS 
+
+products }o--|| categories : belongs to >
+products ||--o{ product_labels : has tags >
+labels ||--o{ product_labels : tagged by >
+
+' =============================
+' SharedKernel.puml
+' =============================
+
+
+
+entity "currencies" {
+  + code : CHAR(3) <<PK>> "ISO 4217"
+  --
+  name : VARCHAR(100)
+  symbol : VARCHAR(5)
+  decimal_places : SMALLINT <<DEFAULT 2>>
+  created_at : TIMESTAMP
+}
+
+entity "addresses" {
+  + id : UUID <<PK>> <<FK>> "references users(id)"
+  --
+  street : VARCHAR(255)
+  city : VARCHAR(100)
+  state : VARCHAR(100)
+  zip_code : VARCHAR(20)
+  country : CHAR(2) "ISO country code"
+  is_valid : BOOLEAN <<DEFAULT false>>
+  validated_at : TIMESTAMP
+}
+
+
+
+entity "notifications" {
+  + id : UUID <<PK>>
+  --
+  user_id : UUID
+  message : TEXT
+  type : ENUM('EMAIL','PUSH','SMS','IN_APP') <<NOT NULL>>
+  payload : JSON
+}
+
+' =============================
+' User Management.puml
+' =============================
+
+
+entity "roles" {
+  + id : UUID <<PK>>
+  --
+  name : VARCHAR(50) <<UNIQUE>> <<NOT NULL>>
+  description : TEXT
+  created_at : TIMESTAMP
+}
+
+entity "user_roles" {
+  + user_id : UUID <<FK>> "references users(id)"
+  + role_id : UUID <<FK>> "references roles(id)"
+  --
+  <<PK>> (user_id, role_id)
+  assigned_at : TIMESTAMP <<NOT NULL>>
+}
+
+entity "tokens" {
+  + token : VARCHAR(512) <<PK>>
+  --
+  user_id : UUID <<FK>> "references users(id)"
+  issued_at : TIMESTAMP <<NOT NULL>>
+  expires_at : TIMESTAMP <<NOT NULL>>
+  is_revoked : BOOLEAN <<DEFAULT false>>
+  device_info : VARCHAR(255)
+  ip_address : VARCHAR(45)
+}
+
+' =============================
+' RELATIONSHIPS
+' =============================
+users ||--|| addresses : "has address"
+users ||--o{ user_roles : "has roles"
+user_roles }|--|| roles : "assigned role"
+users ||--o{ tokens : "issued tokens"
+notifications }|--|| users : "notifica a"
+products }o--|| currencies : "usa moneda"
+payments }o--|| currencies : "pago en"
+Design }|--|| users : "propiedad de"
+order_items }o--|| currencies : "precio en"
+order_items }o--|| products : "producto referenciado"
+users ||--o{ addresses : "tiene direcciones"
+
+
+
+
+
+
+
+
+@enduml
+
+
+
+

@@ -1,0 +1,182 @@
+@startuml Shared Kernel
+
+package "Shared Kernel" {
+  note "Domain-Driven Design Shared Kernel" as N1
+
+  ' ==== VALUE OBJECTS ====
+  package "Value Objects" {
+    class Money <<ValueObject>> {
+      - BigDecimal amount
+      - Currency currency
+      + BigDecimal getAmount()
+      + Currency getCurrency()
+      + Money add(Money other)
+      + Money subtract(Money other)
+      + Money multiply(double multiplier)
+    }
+
+    class Currency <<ValueObject>> {
+      - String code
+      + String getCode()
+      + {static} Currency fromCode(String code)
+    }
+
+    class Address <<ValueObject>> {
+      - String street
+      - String city
+      - String state
+      - String zipCode
+      - String country
+      + boolean equals(Object other)
+      + String toString()
+      + boolean isValid()
+    }
+
+    abstract class Id<T> <<ValueObject>> {
+      - T value
+      # Id(T value)
+      + T getValue()
+      + boolean equals(Object other)
+      + int hashCode()
+    }
+
+    class EntityId <<ValueObject>> {
+      + EntityId(UUID value)
+    }
+
+    class OrderId <<ValueObject>> {
+      - UUID value
+      + OrderId(UUID value)
+    }
+
+    class CustomerName <<ValueObject>> {
+      - String value
+      + String getValue()
+    }
+  }
+
+  ' ==== ENTITIES ====
+  package "Entities" {
+    abstract class Entity<ID extends Id<?>> {
+      - ID id
+      # Entity(ID id)
+      + ID getId()
+      + boolean equals(Object other)
+      + int hashCode()
+    }
+  }
+
+  ' ==== INFRASTRUCTURE SERVICES ====
+  package "Infrastructure Services" {
+    interface ImageService {
+      + String uploadImage(byte[] imageData)
+      + void deleteImage(String imageUrl)
+      + String transformImage(String imageUrl, Map<String, Object> options)
+      + ImageMetadata getImageMetadata(String imageUrl)
+    }
+
+    class ImageMetadata {
+      - int width
+      - int height
+      - String format
+      - long size
+    }
+
+    interface DateTimeService {
+      + LocalDateTime getCurrentDateTime()
+      + LocalDate getCurrentDate()
+      + LocalDateTime convertToUserTimeZone(LocalDateTime dateTime, String timeZoneId)
+    }
+  }
+
+  ' ==== REPOSITORY INTERFACES ====
+  package "Repository Interfaces" {
+    interface Repository<T extends Entity<ID>, ID extends Id<?>> {
+      + Optional<T> findById(ID id)
+      + List<T> findAll()
+      + void save(T entity)
+      + void delete(T entity)
+      + boolean existsById(ID id)
+    }
+  }
+
+  ' ==== DOMAIN SERVICES ====
+  package "Domain Services" {
+    interface NotificationService {
+      + void sendNotification(Notification notification)
+      + List<Notification> getPendingNotifications(UserId userId)
+    }
+
+    class Notification {
+      - UUID id
+      - String message
+      - NotificationType type
+      - Object payload
+    }
+
+    enum NotificationType {
+      EMAIL
+      PUSH
+      SMS
+      IN_APP
+    }
+  }
+
+  ' ==== EXCEPTIONS ====
+  package "Exceptions" {
+    abstract class DomainException {
+      # DomainException(String message)
+    }
+
+    class ValidationException {
+      + ValidationException(String message)
+    }
+
+    class ResourceNotFoundException {
+      + ResourceNotFoundException(String message)
+    }
+
+    class BusinessRuleViolationException {
+      + BusinessRuleViolationException(String message)
+    }
+  }
+
+  ' ==== UTILITIES ====
+  package "Utilities" {
+    class ValidationUtils {
+      + {static} boolean isValidEmail(String email)
+      + {static} boolean isValidPhone(String phone)
+      + {static} boolean isValidPostalCode(String postalCode, String country)
+    }
+  }
+
+  ' ==== DOMAIN EVENTS ====
+  package "Domain Events" {
+    abstract class DomainEvent {
+      - UUID eventId
+      - LocalDateTime occurredOn
+      # DomainEvent()
+      + UUID getEventId()
+      + LocalDateTime getOccurredOn()
+    }
+
+    interface DomainEventPublisher {
+      + void publish(DomainEvent event)
+      + void registerHandler(Class<? extends DomainEvent> eventType, DomainEventHandler handler)
+    }
+
+    interface DomainEventHandler<T extends DomainEvent> {
+      + void handle(T event)
+    }
+  }
+
+  ' ===== RELATIONSHIPS =====
+  Money --> Currency
+  EntityId --|> Id
+  DomainException <|-- ValidationException
+  DomainException <|-- ResourceNotFoundException
+  DomainException <|-- BusinessRuleViolationException
+  Notification --> NotificationType
+}
+
+@enduml

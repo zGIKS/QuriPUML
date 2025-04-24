@@ -1,0 +1,89 @@
+@startuml
+' =============================
+' DATABASE SCHEMA (Improved with Explicit Relationships)
+' =============================
+
+entity "products" as P {
+  + id : UUID <<PK>>
+  --
+  title : VARCHAR(255)
+  description : TEXT
+  price_amount : DECIMAL(19,4)
+  price_currency : VARCHAR(3)
+  rating_value : FLOAT
+  rating_max : INTEGER
+  preview_image_url : VARCHAR(512)
+  stock : INTEGER
+  is_active : BOOLEAN
+  category_id : UUID <<FK>>
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "categories" as C {
+  + id : UUID <<PK>>
+  --
+  name : VARCHAR(255)
+  description : TEXT
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "labels" as L {
+  + id : UUID <<PK>>
+  --
+  value : VARCHAR(100)
+  color_code : VARCHAR(7)
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "product_labels" as PL {
+  + product_id : UUID <<FK>>
+  + label_id : UUID <<FK>>
+  --
+  assigned_at : TIMESTAMP
+  <<PK>> (product_id, label_id)
+}
+
+' =============================
+' RELATIONSHIPS (VISUALIZED)
+' =============================
+
+P }o--|| C : belongs to >
+P ||--o{ PL : has tags >
+L ||--o{ PL : tagged by >
+
+' =============================
+' VALUE OBJECTS (DOCUMENTATION)
+' =============================
+class Money <<(V,#ADD1B2)>> {
+  + amount : DECIMAL
+  + currency : VARCHAR(3)
+}
+
+class Score <<(V,#ADD1B2)>> {
+  + value : FLOAT
+  + max_value : INTEGER
+}
+
+class Image <<(V,#ADD1B2)>> {
+  + url : VARCHAR(512)
+}
+
+note right of P
+  Includes Money (price), Score (rating),
+  and Image (preview_image_url).
+end note
+
+note right of PL
+  Join table between products and labels.
+  Composite PK: product_id + label_id.
+end note
+
+note right of L
+  Labels are reusable tags.
+  Styled with hex color code.
+end note
+
+@enduml

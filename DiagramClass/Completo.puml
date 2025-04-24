@@ -1,0 +1,1090 @@
+@startuml
+' =============================
+' DOMAIN LAYER
+' =============================
+package "Domain Layer" {
+
+  enum ExportFormat {
+    IMAGE,
+    PDF
+  }
+
+  enum TextAlignment {
+    LEFT,
+    CENTER,
+    RIGHT
+  }
+
+  class Design <<Entity>> {
+    - UUID id
+    - String name
+    - String description
+    - UUID ownerId
+    - Date creationDate
+    - List<Layer> layers
+    - boolean isPublic
+    + addLayer(Layer layer): void
+    + removeLayer(Layer layer): void
+    + getPreview(): Image
+    + getLayers(): List<Layer>
+    + duplicateDesign(): Design
+    + exportDesign(format: ExportFormat): File
+  }
+
+  abstract class Layer <<Entity>> {
+    - String name
+    - float positionX
+    - float positionY
+    - float rotation
+    - float scale
+    - int zIndex
+    - boolean locked
+    + move(float x, float y): void
+    + scaleTo(float value): void
+    + rotate(float degrees): void
+    + lock(): void
+    + unlock(): void
+    + isLocked(): boolean
+  }
+
+  class TextLayer <<Entity>> extends Layer {
+    - String text
+    - String font
+    - String color
+    - float fontSize
+    - TextAlignment alignment
+    - boolean bold
+    - boolean italic
+    - boolean underline
+    + updateText(String newText): void
+    + changeFont(String newFont): void
+    + changeColor(String newColor): void
+    + changeFontSize(float newSize): void
+    + changeAlignment(TextAlignment alignment): void
+  }
+
+  class ImageLayer <<Entity>> extends Layer {
+    - String imageUrl
+    - float opacity
+    - float width
+    - float height
+    - boolean maintainAspectRatio
+    + updateImage(String newUrl): void
+    + changeOpacity(float newOpacity): void
+    + getImageUrl(): String
+    + resize(float newWidth, float newHeight): void
+  }
+
+  class ShapeLayer <<Entity>> extends Layer {
+    - String shapeType
+    - String fillColor
+    - String borderColor
+    - float borderWidth
+    - String shapeId
+    + updateShape(String newShapeType): void
+    + updateColors(String newFillColor, String newBorderColor): void
+  }
+
+  class Template <<Entity>> {
+    - UUID id
+    - String name
+    - String category
+    - boolean isPremium
+    - Design baseDesign
+    + getDesign(): Design
+  }
+
+  Template "1" --> "1" Design : baseDesign
+  Design "1" --> "*" Layer : contains
+}
+
+' =============================
+' APPLICATION LAYER
+' =============================
+package "Application Layer" {
+
+  class TemplateService {
+    + createTemplate(String name, Design baseDesign): Template
+    + getTemplateById(UUID id): Template
+    + listTemplates(): List<Template>
+  }
+
+  class DesignService {
+    + addLayerToDesign(UUID designId, Layer layer): void
+    + removeLayerFromDesign(UUID designId, Layer layer): void
+    + updateLayer(UUID designId, Layer updatedLayer): void
+    + getPreview(UUID designId): Image
+    + duplicateDesign(UUID designId): Design
+    + exportDesign(UUID designId, ExportFormat format): File
+  }
+
+  TemplateService --> Template
+  DesignService --> Design
+}
+
+' =============================
+' INFRASTRUCTURE LAYER
+' =============================
+package "Infrastructure Layer" {
+
+  class CloudinaryAdapter {
+    + uploadImage(byte[] imageData): String
+    + deleteImage(String imageUrl): void
+    + transformImage(String url, Map<String, String> options): String
+    + getImageMetadata(String url): ImageMetadata
+  }
+
+  ImageLayer --> CloudinaryAdapter : uses >
+}
+
+' =============================
+' INTERFACE LAYER
+' =============================
+package "Interface Layer" {
+
+  class TemplateController {
+    + getTemplate(UUID id): Template
+    + createTemplate(String name, Design baseDesign): Template
+    + listTemplates(): List<Template>
+  }
+
+  class DesignController {
+    + postLayer(UUID designId, Layer layer): void
+    + deleteLayer(UUID designId, Layer layer): void
+    + updateLayer(UUID designId, Layer updatedLayer): void
+    + getPreview(UUID designId): Image
+    + duplicateDesign(UUID designId): Design
+    + exportDesign(UUID designId, ExportFormat format): File
+  }
+
+  TemplateController --> TemplateService
+  DesignController --> DesignService
+}
+
+class OrderId <<ValueObject>> {
+    - UUID value
+  + OrderId(UUID value)
+}
+
+package "Domain Layer" {
+
+  class Fulfillment <<Entity>> {
+    - UUID id
+    - OrderId orderId
+    - FulfillmentStatus status
+    - FulfillmentDate fulfillmentDate
+    - boolean isCanceled
+    - Date shippedAt
+    - Date packedAt
+    + start(): void
+    + markPacked(): void
+    + markShipped(): void
+    + getStatus(): FulfillmentStatus
+    + cancel(): void
+    + isDelayed(): boolean
+    + estimateDeliveryDate(): Date
+  }
+
+  enum FulfillmentStatus {
+    PENDING
+    IN_PRODUCTION
+    PACKED
+    SHIPPED
+    DELIVERED
+    CANCELED
+  }
+
+  interface FulfillmentRepository {
+    + save(Fulfillment fulfillment): void
+    + findByOrderId(OrderId orderId): Fulfillment
+    + updateStatus(OrderId orderId, FulfillmentStatus status): void
+  }
+
+  class FulfillmentDate <<ValueObject>> {
+    - Date startedAt
+    - Date completedAt
+    + getStartedAt(): Date
+    + getCompletedAt(): Date
+    + calculateDuration(): long
+  }
+
+  Fulfillment --> OrderId
+  Fulfillment --> FulfillmentStatus
+  Fulfillment --> FulfillmentDate
+}
+
+' =============================
+' APPLICATION LAYER
+' =============================
+package "Application Layer" {
+
+  class FulfillmentService {
+    - FulfillmentRepository fulfillmentRepository
+    - ShippingService shippingService
+    + initiateFulfillment(OrderId orderId): void
+    + packOrder(OrderId orderId): void
+    + shipOrder(OrderId orderId): void
+    + cancelFulfillment(OrderId orderId): void
+    + getEstimatedDeliveryDate(OrderId orderId): Date
+    + isOrderDelayed(OrderId orderId): boolean
+  }
+
+  FulfillmentService --> Fulfillment
+  FulfillmentService --> FulfillmentRepository
+}
+
+' =============================
+' INFRASTRUCTURE LAYER
+' =============================
+package "Infrastructure Layer" {
+
+  class FulfillmentRepositoryImpl {
+    - Map<OrderId, Fulfillment> database
+    + save(Fulfillment fulfillment): void
+    + findByOrderId(OrderId orderId): Fulfillment
+    + updateStatus(OrderId orderId, FulfillmentStatus status): void
+  }
+
+  FulfillmentRepositoryImpl ..|> FulfillmentRepository
+}
+
+' =============================
+' INTERFACE LAYER
+' =============================
+package "Interface Layer" {
+
+  class FulfillmentController {
+    - FulfillmentService fulfillmentService
+    + startFulfillment(OrderId orderId): String
+    + packOrder(OrderId orderId): String
+    + shipOrder(OrderId orderId): String
+    + cancelFulfillment(OrderId orderId): String
+    + getEstimatedDeliveryDate(OrderId orderId): Date
+    + isOrderDelayed(OrderId orderId): boolean
+  }
+
+  FulfillmentController --> FulfillmentService
+}
+
+
+class OrderId <<ValueObject>> {
+    - UUID value
+  + OrderId(UUID value)
+}
+
+ class Money <<ValueObject>> {
+      - BigDecimal amount
+      - Currency currency
+      + BigDecimal getAmount()
+      + Currency getCurrency()
+      + Money add(Money other)
+      + Money subtract(Money other)
+      + Money multiply(double multiplier)
+    }
+
+package "Domain Layer" {
+
+  class Order <<Entity>> {
+    - OrderId id
+    - Date orderDate
+    - OrderStatus status
+    - User customer
+    - List<OrderItem> items
+    + calculateTotal(): Money
+    + markAsReady(): void
+    + addItem(OrderItem item): void
+  }
+
+  Order --> OrderId
+
+  class OrderItem <<Entity>> {
+    - UUID id
+    - ProductName productName
+    - Quantity quantity
+    - Money unitPrice
+    + getSubtotal(): Money
+  }
+
+  enum OrderStatus {
+    PENDING
+    PAID
+    CANCELLED
+    READY_FOR_PRODUCTION
+  }
+
+  interface OrderRepository {
+    + save(Order order): void
+    + findById(UUID id): Order
+    + update(Order order): void
+  }
+
+  class Quantity <<ValueObject>> {
+    - int value
+    + getValue(): int
+  }
+
+  class ProductName <<ValueObject>> {
+    - String value
+    + getValue(): String
+  }
+
+  class User <<Entity>> {
+    - UUID id
+    - String fullName
+    - String email
+    + getFullName(): String
+    + getEmail(): String
+  }
+
+  Order --> OrderItem : contains >
+  Order --> OrderStatus
+  Order --> User : placed by >
+  OrderItem --> Money
+  OrderItem --> Quantity
+  OrderItem --> ProductName
+}
+
+' =============================
+' APPLICATION LAYER
+' =============================
+
+
+package "Application Layer" {
+
+  interface PaymentGateway {
+    + processPayment(UUID orderId, Money amount, String paymentMethod): boolean
+    + refundPayment(UUID orderId): boolean
+    + validateCard(String cardNumber, String cvv, String expiryDate): boolean
+    + getPaymentStatus(UUID orderId): String
+  }
+
+  class OrderService {
+    - OrderRepository orderRepository
+    - PaymentGateway paymentGateway
+    + createOrder(User user, List<OrderItem> items): Order
+    + payOrder(UUID orderId): void
+    + cancelOrder(UUID orderId): void
+    + markOrderReady(UUID orderId): void
+  }
+
+  OrderService --> Order
+  OrderService --> OrderRepository
+  OrderService --> PaymentGateway
+}
+
+' =============================
+' INFRASTRUCTURE LAYER
+' =============================
+package "Infrastructure Layer" {
+
+  class OrderRepositoryImpl {
+    - Map<UUID, Order> database
+    + save(Order order): void
+    + findById(UUID id): Order
+    + update(Order order): void
+  }
+
+  class PaymentGatewayAdapter {
+    + processPayment(UUID orderId, Money amount, String paymentMethod): boolean
+    + refundPayment(UUID orderId): boolean
+    + validateCard(String cardNumber, String cvv, String expiryDate): boolean
+    + getPaymentStatus(UUID orderId): String
+  }
+
+  OrderRepositoryImpl ..|> OrderRepository
+  PaymentGatewayAdapter ..|> PaymentGateway
+}
+
+' =============================
+' INTERFACE LAYER
+' =============================
+package "Interface Layer" {
+
+  class OrderController {
+    - OrderService orderService
+    + postOrder(User user, List<OrderItem> items): Order
+    + payOrder(UUID orderId): void
+    + cancelOrder(UUID orderId): void
+    + markReady(UUID orderId): void
+  }
+
+  OrderController --> OrderService
+}
+
+class Money <<ValueObject>> {
+  - BigDecimal amount
+  - Currency currency
+  + BigDecimal getAmount()
+  + Currency getCurrency()
+  + Money add(Money other)
+  + Money subtract(Money other)
+  + Money multiply(double multiplier)
+}
+
+package "Domain Layer" {
+    enum PaymentStatus {
+        PENDING,
+        COMPLETED,
+        FAILED,
+        REFUNDED
+    }
+
+  class Payment <<Entity>> {
+    - UUID id
+    - Money amount
+    - PaymentStatus status;
+
+    + getStatus(): PaymentStatus
+    + getAmount(): Money
+  }
+
+  interface PaymentProcessor {
+    + processPayment(Payment payment): boolean
+    + refundPayment(Payment payment): boolean
+  }
+
+  class PaymentEvent <<DomainEvent>> {
+    - UUID paymentId
+    - String eventType
+    - Date timestamp
+    - String details
+  }
+
+  class Invoice {
+    - UUID id
+    - Payment payment
+    - String invoiceNumber
+    - Date issuedAt
+  }
+
+  class PaymentRetryPolicy {
+    + shouldRetry(Payment payment): boolean
+    + getNextRetryDelay(Payment payment): Duration
+  }
+
+  class PaymentSpecification {
+    + isSatisfiedBy(Payment payment): boolean
+  }
+
+  Payment --> Money
+  Payment --> PaymentEvent
+  Payment --> Invoice
+}
+
+' =============================
+' APPLICATION LAYER
+' =============================
+
+package "Application Layer" {
+
+  class PaymentService {
+    - PaymentProcessorFactory processorFactory
+    + makePayment(Payment payment): boolean
+    + issueRefund(Payment payment): boolean
+  }
+
+  class PaymentProcessorFactory {
+    + getProcessorFor(Payment payment): PaymentProcessor
+  }
+
+  PaymentService --> Payment
+  PaymentService --> PaymentProcessorFactory
+  PaymentService --> PaymentSpecification
+  PaymentService --> PaymentRetryPolicy
+}
+
+' =============================
+' INFRASTRUCTURE LAYER
+' =============================
+package "Infrastructure Layer" {
+
+  class StripePaymentAdapter {
+    - String stripeApiKey
+    + processPayment(Payment payment): boolean
+    + refundPayment(Payment payment): boolean
+  }
+
+  class "Stripe API" {
+    + createPaymentIntent(BigDecimal amount, String currency): String
+    + confirmPayment(String paymentIntentId): boolean
+  }
+
+  StripePaymentAdapter --> "Stripe API"
+  StripePaymentAdapter ..|> PaymentProcessor
+}
+
+' =============================
+' INTERFACE LAYER
+' =============================
+package "Interface Layer" {
+
+  class PaymentController {
+    - PaymentService paymentService
+    + pay(Payment payment): boolean
+    + refund(Payment payment): boolean
+  }
+
+  class AuthenticatedUser {
+    - UUID userId
+    - List<Role> roles
+    + hasRole(String role): boolean
+  }
+
+  PaymentController --> PaymentService
+  PaymentController --> AuthenticatedUser
+}
+
+    class Money <<ValueObject>> {
+      - BigDecimal amount
+      - Currency currency
+      + BigDecimal getAmount()
+      + Currency getCurrency()
+      + Money add(Money other)
+      + Money subtract(Money other)
+      + Money multiply(double multiplier)
+    }
+
+
+package "Domain Layer" {
+
+  class ProductId <<ValueObject>> {
+    - UUID value
+    + getValue(): UUID
+  }
+
+  class CategoryId <<ValueObject>> {
+    - UUID value
+    + getValue(): UUID
+  }
+
+  class CategoryName <<ValueObject>> {
+    - String value
+    + getValue(): String
+  }
+
+  class Image <<ValueObject>> {
+    - String url
+    + getUrl(): String
+  }
+
+  class ProductDescription <<ValueObject>> {
+    - String value
+    + getValue(): String
+    + isValid(): boolean
+  }
+
+  class Score <<ValueObject>> {
+    - float value
+    - int maxValue
+    + getValue(): float
+    + getPercentage(): float
+    + isValid(): boolean
+    + compareTo(Score other): int
+  }
+
+  class Label <<ValueObject>> {
+    - String value
+    - String colorCode
+    + getValue(): String
+    + getColor(): String
+    + isValid(): boolean
+    + updateColor(String newColor): void
+  }
+
+  class Product <<Entity>> {
+    - ProductId id
+    - String title
+    - ProductDescription description
+    - Money price
+    - List<Label> tags
+    - Score rating
+    - Image previewImage
+    - int stock
+    - boolean isActive
+    - LocalDateTime createdAt
+    - LocalDateTime updatedAt
+    + getInfo(): String
+    + getPreview(): Image
+    + calculateAverageScore(): float
+    + addTag(Label tag): void
+    + removeTag(Label tag): void
+    + updateStock(int newStock): void
+    + updateDescription(ProductDescription newDescription): void
+    + updatePrice(Price newPrice): void
+    + updatePreviewImage(Image newImage): void
+    + activate(): void
+    + deactivate(): void
+  }
+
+  class Category <<Entity>> {
+    - CategoryId id
+    - CategoryName name
+    - String description
+    - List<Product> products
+    + getName(): String
+    + getDescription(): String
+    + addProduct(Product product): void
+    + removeProduct(Product product): void
+  }
+
+  Product *-- ProductId
+  Product *-- ProductDescription
+  Product *-- Money
+  Product *-- Score
+  Product *-- "0..*" Label
+  Product *-- Image
+  Product --> Category
+
+  Category *-- CategoryId
+  Category *-- CategoryName
+}
+
+' =============================
+' APPLICATION LAYER
+' =============================
+package "Application Layer" {
+
+  interface ProductRepository {
+    + findAll(): List<Product>
+    + findById(ProductId id): Product
+    + findByCategory(CategoryId categoryId): List<Product>
+    + findByScore(Score minScore): List<Product>
+    + findByLabel(Label label): List<Product>
+    + findActiveProducts(): List<Product>
+    + findOutOfStockProducts(): List<Product>
+    + save(Product product): void
+    + delete(ProductId id): void
+  }
+
+  interface CategoryRepository {
+    + findAll(): List<Category>
+    + findById(CategoryId id): Category
+    + save(Category category): void
+    + delete(CategoryId id): void
+  }
+
+  class ProductCatalogService {
+    - ProductRepository productRepository
+    - CategoryRepository categoryRepository
+    + listAllProducts(): List<Product>
+    + fetchProductById(ProductId id): Product
+    + listByCategory(CategoryId categoryId): List<Product>
+    + listTopRated(Score minScore): List<Product>
+    + listByLabel(Label label): List<Product>
+    + listActive(): List<Product>
+    + listOutOfStock(): List<Product>
+    + updateStock(ProductId id, int newStock): void
+    + updateDescription(ProductId id, ProductDescription newDesc): void
+    + updatePrice(ProductId id, Price newPrice): void
+    + updatePreviewImage(ProductId id, Image newImage): void
+    + changeCategory(ProductId id, CategoryId newCategory): void
+    + createProduct(Product product): void
+    + deleteProduct(ProductId id): void
+    + activate(ProductId id): void
+    + deactivate(ProductId id): void
+  }
+
+  class CategoryService {
+    - CategoryRepository categoryRepository
+    + listAllCategories(): List<Category>
+    + getCategoryById(CategoryId id): Category
+    + createCategory(Category category): void
+    + updateCategory(CategoryId id, CategoryName name, String description): void
+    + deleteCategory(CategoryId id): void
+  }
+
+  ProductCatalogService --> Product
+  ProductCatalogService --> ProductRepository
+  ProductCatalogService --> CategoryRepository
+  CategoryService --> CategoryRepository
+}
+
+' =============================
+' INFRASTRUCTURE LAYER
+' =============================
+package "Infrastructure Layer" {
+
+  class ProductRepositoryImpl {
+    - List<Product> productsDB
+    + findAll(): List<Product>
+    + findById(ProductId id): Product
+    + findByCategory(CategoryId categoryId): List<Product>
+    + findByScore(Score minScore): List<Product>
+    + findByLabel(Label label): List<Product>
+    + findActiveProducts(): List<Product>
+    + findOutOfStockProducts(): List<Product>
+    + save(Product product): void
+    + delete(ProductId id): void
+  }
+
+  class CategoryRepositoryImpl {
+    - List<Category> categoriesDB
+    + findAll(): List<Category>
+    + findById(CategoryId id): Category
+    + save(Category category): void
+    + delete(CategoryId id): void
+  }
+
+  class CloudinaryImageService {
+    - String cloudName
+    + getImageUrl(String imageId): String
+    + deleteImage(String imageUrl): void
+    + transformImage(String imageUrl, Map<String, String> options): String
+  }
+
+  ProductRepositoryImpl --> CloudinaryImageService
+  ProductRepositoryImpl ..|> ProductRepository
+  CategoryRepositoryImpl ..|> CategoryRepository
+}
+
+' =============================
+' INTERFACE LAYER
+' =============================
+package "Interface Layer" {
+
+  class ProductCatalogController {
+    - ProductCatalogService catalogService
+    + getAll(): List<Product>
+    + getById(ProductId id): Product
+    + getByCategory(CategoryId categoryId): List<Product>
+    + getTopRated(float minScore): List<Product>
+    + getByLabel(String label): List<Product>
+    + getActive(): List<Product>
+    + getOutOfStock(): List<Product>
+    + create(Product product): void
+    + updateStock(ProductId id, int newStock): void
+    + updatePrice(ProductId id, Price newPrice): void
+    + updateDescription(ProductId id, ProductDescription newDesc): void
+    + updateImage(ProductId id, Image newImage): void
+    + changeCategory(ProductId id, CategoryId newCategory): void
+    + activate(ProductId id): void
+    + deactivate(ProductId id): void
+    + delete(ProductId id): void
+  }
+
+  class CategoryController {
+    - CategoryService categoryService
+    + getAllCategories(): List<Category>
+    + getCategory(CategoryId id): Category
+    + createCategory(Category category): void
+    + updateCategory(CategoryId id, CategoryName name, String description): void
+    + deleteCategory(CategoryId id): void
+  }
+
+  ProductCatalogController --> ProductCatalogService
+  CategoryController --> CategoryService
+}
+
+package "Shared Kernel" {
+  note "Domain-Driven Design Shared Kernel" as N1
+
+  ' ==== VALUE OBJECTS ====
+  package "Value Objects" {
+    class Money <<ValueObject>> {
+      - BigDecimal amount
+      - Currency currency
+      + BigDecimal getAmount()
+      + Currency getCurrency()
+      + Money add(Money other)
+      + Money subtract(Money other)
+      + Money multiply(double multiplier)
+    }
+
+    class OrderId <<ValueObject>> {
+    - UUID value
+      + OrderId(UUID value)
+    }
+
+    class Currency <<ValueObject>> {
+      - String code
+      + String getCode()
+      + {static} Currency fromCode(String code)
+    }
+
+    class Address <<ValueObject>> {
+      - String street
+      - String city
+      - String state
+      - String zipCode
+      - String country
+      + boolean equals(Object other)
+      + String toString()
+      + boolean isValid()
+    }
+
+    abstract class Id<T> <<ValueObject>> {
+      - T value
+      # Id(T value)
+      + T getValue()
+      + boolean equals(Object other)
+      + int hashCode()
+    }
+
+    class EntityId <<ValueObject>> {
+      + EntityId(UUID value)
+    }
+
+    class CustomerName <<ValueObject>> {
+      - String value
+      + String getValue()
+    }
+  }
+
+  ' ==== ENTITIES ====
+  package "Entities" {
+    abstract class Entity<ID extends Id<?>> {
+      - ID id
+      # Entity(ID id)
+      + ID getId()
+      + boolean equals(Object other)
+      + int hashCode()
+    }
+
+
+  }
+
+  ' ==== SERVICES ====
+  package "Infrastructure Services" {
+    interface ImageService {
+      + String uploadImage(byte[] imageData)
+      + void deleteImage(String imageUrl)
+      + String transformImage(String imageUrl, Map<String, Object> options)
+      + ImageMetadata getImageMetadata(String imageUrl)
+    }
+
+    class ImageMetadata {
+      - int width
+      - int height
+      - String format
+      - long size
+    }
+
+    interface DateTimeService {
+      + LocalDateTime getCurrentDateTime()
+      + LocalDate getCurrentDate()
+      + LocalDateTime convertToUserTimeZone(LocalDateTime dateTime, String timeZoneId)
+    }
+  }
+
+  ' ==== REPOSITORIES ====
+  package "Repository Interfaces" {
+    interface Repository<T extends Entity<ID>, ID extends Id<?>> {
+      + Optional<T> findById(ID id)
+      + List<T> findAll()
+      + void save(T entity)
+      + void delete(T entity)
+      + boolean existsById(ID id)
+    }
+  }
+
+  ' ==== DOMAIN SERVICES ====
+  package "Domain Services" {
+    interface NotificationService {
+      + void sendNotification(Notification notification)
+      + List<Notification> getPendingNotifications(UserId userId)
+    }
+
+    class Notification {
+      - UUID id
+      - String message
+      - NotificationType type
+      - Object payload
+    }
+
+    enum NotificationType {
+      EMAIL
+      PUSH
+      SMS
+      IN_APP
+    }
+  }
+
+  ' ==== EXCEPTIONS ====
+  package "Exceptions" {
+    abstract class DomainException {
+      # DomainException(String message)
+    }
+
+    class ValidationException {
+      + ValidationException(String message)
+    }
+
+    class ResourceNotFoundException {
+      + ResourceNotFoundException(String message)
+    }
+
+    class BusinessRuleViolationException {
+      + BusinessRuleViolationException(String message)
+    }
+  }
+
+  ' ==== UTILITIES ====
+  package "Utilities" {
+    class ValidationUtils {
+      + {static} boolean isValidEmail(String email)
+      + {static} boolean isValidPhone(String phone)
+      + {static} boolean isValidPostalCode(String postalCode, String country)
+    }
+  }
+
+  ' ==== EVENTS ====
+  package "Domain Events" {
+    abstract class DomainEvent {
+      - UUID eventId
+      - LocalDateTime occurredOn
+      # DomainEvent()
+      + UUID getEventId()
+      + LocalDateTime getOccurredOn()
+    }
+
+    interface DomainEventPublisher {
+      + void publish(DomainEvent event)
+      + void registerHandler(Class<? extends DomainEvent> eventType, DomainEventHandler handler)
+    }
+
+    interface DomainEventHandler<T extends DomainEvent> {
+      + void handle(T event)
+    }
+  }
+
+  ' ===== RELATIONSHIPS =====
+  Money --> Currency
+  EntityId --|> Id
+  DomainException <|-- ValidationException
+  DomainException <|-- ResourceNotFoundException
+  DomainException <|-- BusinessRuleViolationException
+  Notification --> NotificationType
+}
+
+
+' =============================
+' DOMAIN LAYER
+' =============================
+package "Domain Layer" {
+  class User <<Entity>> {
+    - UUID id
+    - Username username
+    - Email email
+    - Password password
+    - Set<Role> roles
+    - Address address
+    + boolean isAuthorized(String permission)
+    + boolean changePassword(Password oldPassword, Password newPassword)
+  }
+
+  class Username <<ValueObject>> {
+    - String value
+    + Username(String value)
+    + String getValue()
+    + boolean isValid()
+  }
+
+  class Email <<ValueObject>> {
+    - String value
+    + Email(String value)
+    + String getValue()
+    + boolean isValid()
+  }
+
+  class Password <<ValueObject>> {
+    - String hash
+    - String salt
+    - Date createdAt
+    - boolean expired
+    + static Password createFromPlainText(String plainText)
+    + boolean matches(String plainText)
+    + boolean isExpired()
+  }
+
+  class Role <<ValueObject>> {
+    - String name
+    + String getName()
+  }
+
+  class Address <<ValueObject>> {
+    - String street
+    - String city
+    - String state
+    - String zipCode
+    - String country
+    + boolean equals(Object other)
+    + String toString()
+  }
+
+  class Token <<ValueObject>> {
+    - String value
+    + Token(String value)
+    + String getValue()
+    + boolean isValid()
+  }
+
+  User --> Username
+  User --> Email
+  User --> Password
+  User "1" --> "0..*" Role
+  User --> Address
+}
+
+' =============================
+' APPLICATION LAYER
+' =============================
+package "Application Layer" {
+  interface IUserRepository {
+    + User findByUsername(Username username)
+    + void save(User user)
+    + boolean existsByEmail(Email email)
+  }
+
+  interface IAuthService {
+    + boolean authenticate(Username username, Password password)
+    + Token generateToken(User user)
+  }
+
+  class UserService {
+    - IUserRepository userRepository
+    - IAuthService authService
+    + boolean registerUser(Username username, Email email, Password password)
+    + Token login(Username username, Password password)
+    + boolean changePassword(Username username, Password oldPassword, Password newPassword)
+  }
+
+  UserService --> IUserRepository
+  UserService --> IAuthService
+  UserService --> User : «manages»
+}
+
+' =============================
+' INFRASTRUCTURE LAYER
+' =============================
+package "Infrastructure Layer" {
+  class UserRepositoryImpl {
+    + User findByUsername(Username username)
+    + void save(User user)
+    + boolean existsByEmail(Email email)
+  }
+
+  class JwtAuthService {
+    + boolean authenticate(Username username, Password password)
+    + Token generateToken(User user)
+  }
+
+  UserRepositoryImpl ..|> IUserRepository
+  JwtAuthService ..|> IAuthService
+  JwtAuthService --> User : «validates»
+}
+
+' =============================
+' INTERFACE/PRESENTATION LAYER
+' =============================
+package "Interface Layer" {
+  class UserController {
+    - UserService userService
+    + ResponseEntity<Boolean> register(String username, String email, String password)
+    + ResponseEntity<String> login(String username, String password)
+    + ResponseEntity<Boolean> changePassword(String username, String oldPassword, String newPassword)
+  }
+
+  UserController --> UserService
+}
+
+@enduml

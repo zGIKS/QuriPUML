@@ -1,0 +1,163 @@
+@startuml
+' =============================
+' DOMAIN LAYER
+' =============================
+package "Domain Layer" {
+
+  enum ExportFormat {
+    IMAGE,
+    PDF
+  }
+
+  enum TextAlignment {
+    LEFT,
+    CENTER,
+    RIGHT
+  }
+
+  class Design <<Entity>> {
+    - UUID id
+    - String name
+    - String description
+    - UUID ownerId
+    - Date creationDate
+    - List<Layer> layers
+    - boolean isPublic
+    + addLayer(Layer layer): void
+    + removeLayer(Layer layer): void
+    + getPreview(): Image
+    + getLayers(): List<Layer>
+    + duplicateDesign(): Design
+    + exportDesign(format: ExportFormat): File
+  }
+
+  abstract class Layer <<Entity>> {
+    - String name
+    - float positionX
+    - float positionY
+    - float rotation
+    - float scale
+    - int zIndex
+    - boolean locked
+    + move(float x, float y): void
+    + scaleTo(float value): void
+    + rotate(float degrees): void
+    + lock(): void
+    + unlock(): void
+    + isLocked(): boolean
+  }
+
+  class TextLayer <<Entity>> extends Layer {
+    - String text
+    - String font
+    - String color
+    - float fontSize
+    - TextAlignment alignment
+    - boolean bold
+    - boolean italic
+    - boolean underline
+    + updateText(String newText): void
+    + changeFont(String newFont): void
+    + changeColor(String newColor): void
+    + changeFontSize(float newSize): void
+    + changeAlignment(TextAlignment alignment): void
+  }
+
+  class ImageLayer <<Entity>> extends Layer {
+    - String imageUrl
+    - float opacity
+    - float width
+    - float height
+    - boolean maintainAspectRatio
+    + updateImage(String newUrl): void
+    + changeOpacity(float newOpacity): void
+    + getImageUrl(): String
+    + resize(float newWidth, float newHeight): void
+  }
+
+  class ShapeLayer <<Entity>> extends Layer {
+    - String shapeType
+    - String fillColor
+    - String borderColor
+    - float borderWidth
+    - String shapeId
+    + updateShape(String newShapeType): void
+    + updateColors(String newFillColor, String newBorderColor): void
+  }
+
+  class Template <<Entity>> {
+    - UUID id
+    - String name
+    - String category
+    - boolean isPremium
+    - Design baseDesign
+    + getDesign(): Design
+  }
+
+  Template "1" --> "1" Design : baseDesign
+  Design "1" --> "*" Layer : contains
+}
+
+' =============================
+' APPLICATION LAYER
+' =============================
+package "Application Layer" {
+
+  class TemplateService {
+    + createTemplate(String name, Design baseDesign): Template
+    + getTemplateById(UUID id): Template
+    + listTemplates(): List<Template>
+  }
+
+  class DesignService {
+    + addLayerToDesign(UUID designId, Layer layer): void
+    + removeLayerFromDesign(UUID designId, Layer layer): void
+    + updateLayer(UUID designId, Layer updatedLayer): void
+    + getPreview(UUID designId): Image
+    + duplicateDesign(UUID designId): Design
+    + exportDesign(UUID designId, ExportFormat format): File
+  }
+
+  TemplateService --> Template
+  DesignService --> Design
+}
+
+' =============================
+' INFRASTRUCTURE LAYER
+' =============================
+package "Infrastructure Layer" {
+
+  class CloudinaryAdapter {
+    + uploadImage(byte[] imageData): String
+    + deleteImage(String imageUrl): void
+    + transformImage(String url, Map<String, String> options): String
+    + getImageMetadata(String url): ImageMetadata
+  }
+
+  ImageLayer --> CloudinaryAdapter : uses >
+}
+
+' =============================
+' INTERFACE LAYER
+' =============================
+package "Interface Layer" {
+
+  class TemplateController {
+    + getTemplate(UUID id): Template
+    + createTemplate(String name, Design baseDesign): Template
+    + listTemplates(): List<Template>
+  }
+
+  class DesignController {
+    + postLayer(UUID designId, Layer layer): void
+    + deleteLayer(UUID designId, Layer layer): void
+    + updateLayer(UUID designId, Layer updatedLayer): void
+    + getPreview(UUID designId): Image
+    + duplicateDesign(UUID designId): Design
+    + exportDesign(UUID designId, ExportFormat format): File
+  }
+
+  TemplateController --> TemplateService
+  DesignController --> DesignService
+}
+@enduml

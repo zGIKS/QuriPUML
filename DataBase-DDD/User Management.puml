@@ -1,0 +1,107 @@
+@startuml
+' =============================
+' USER AUTH & SECURITY DATABASE SCHEMA (Unificado)
+' =============================
+
+entity "users" {
+  + id : UUID <<PK>>
+  --
+  username : VARCHAR(50) <<UNIQUE>> <<NOT NULL>>
+  email : VARCHAR(255) <<UNIQUE>> <<NOT NULL>>
+  password_hash : VARCHAR(255) <<NOT NULL>>
+  password_salt : VARCHAR(100) <<NOT NULL>>
+  password_created_at : TIMESTAMP <<NOT NULL>>
+  password_expired : BOOLEAN <<DEFAULT false>>
+  last_login_at : TIMESTAMP
+  created_at : TIMESTAMP <<NOT NULL>>
+  updated_at : TIMESTAMP <<NOT NULL>>
+}
+
+entity "addresses" {
+  + user_id : UUID <<PK>> <<FK>> "references users(id)"
+  --
+  street : VARCHAR(255)
+  city : VARCHAR(100)
+  state : VARCHAR(100)
+  zip_code : VARCHAR(20)
+  country : CHAR(2) "ISO country code"
+  is_valid : BOOLEAN <<DEFAULT false>>
+}
+
+entity "roles" {
+  + id : UUID <<PK>>
+  --
+  name : VARCHAR(50) <<UNIQUE>> <<NOT NULL>>
+  description : TEXT
+  created_at : TIMESTAMP
+}
+
+entity "user_roles" {
+  + user_id : UUID <<FK>> "references users(id)"
+  + role_id : UUID <<FK>> "references roles(id)"
+  --
+  <<PK>> (user_id, role_id)
+  assigned_at : TIMESTAMP <<NOT NULL>>
+}
+
+entity "tokens" {
+  + token : VARCHAR(512) <<PK>>
+  --
+  user_id : UUID <<FK>> "references users(id)"
+  issued_at : TIMESTAMP <<NOT NULL>>
+  expires_at : TIMESTAMP <<NOT NULL>>
+  is_revoked : BOOLEAN <<DEFAULT false>>
+  device_info : VARCHAR(255)
+  ip_address : VARCHAR(45)
+}
+
+' =============================
+' RELATIONSHIPS
+' =============================
+users ||--|| addresses : "has address"
+users ||--o{ user_roles : "has roles"
+user_roles }|--|| roles : "assigned role"
+users ||--o{ tokens : "issued tokens"
+
+' =============================
+' VALUE OBJECTS DOCUMENTATION
+' =============================
+class Username <<(V,#ADD1B2)>> {
+  + value : VARCHAR(50)
+}
+
+class Email <<(V,#ADD1B2)>> {
+  + value : VARCHAR(255)
+}
+
+class Password <<(V,#ADD1B2)>> {
+  + hash : VARCHAR(255)
+  + salt : VARCHAR(100)
+  + created_at : TIMESTAMP
+  + expired : BOOLEAN
+}
+
+class Token <<(V,#ADD1B2)>> {
+  + value : VARCHAR(512)
+}
+
+' =============================
+' CONSTRAINTS & NOTES
+' =============================
+note right of users
+  - Enforces strong password security
+  - Unique email and username
+  - Tracks login & password expiration
+end note
+
+note right of tokens
+  - JWT tokens used for session & auth
+  - Supports device & IP tracking
+end note
+
+note right of roles
+  - Role-based access model
+  - Common values: ADMIN, USER, etc.
+end note
+
+@enduml

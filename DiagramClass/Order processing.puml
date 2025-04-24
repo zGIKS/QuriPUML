@@ -1,0 +1,149 @@
+@startuml
+' =============================
+' DOMAIN LAYER
+' =============================
+
+class OrderId <<ValueObject>> {
+    - UUID value
+  + OrderId(UUID value)
+}
+
+ class Money <<ValueObject>> {
+      - BigDecimal amount
+      - Currency currency
+      + BigDecimal getAmount()
+      + Currency getCurrency()
+      + Money add(Money other)
+      + Money subtract(Money other)
+      + Money multiply(double multiplier)
+    }
+
+package "Domain Layer" {
+
+  class Order <<Entity>> {
+    - OrderId id
+    - Date orderDate
+    - OrderStatus status
+    - User customer
+    - List<OrderItem> items
+    + calculateTotal(): Money
+    + markAsReady(): void
+    + addItem(OrderItem item): void
+  }
+
+  Order --> OrderId
+
+  class OrderItem <<Entity>> {
+    - UUID id
+    - ProductName productName
+    - Quantity quantity
+    - Money unitPrice
+    + getSubtotal(): Money
+  }
+
+  enum OrderStatus {
+    PENDING
+    PAID
+    CANCELLED
+    READY_FOR_PRODUCTION
+  }
+
+  interface OrderRepository {
+    + save(Order order): void
+    + findById(UUID id): Order
+    + update(Order order): void
+  }
+
+  class Quantity <<ValueObject>> {
+    - int value
+    + getValue(): int
+  }
+
+  class ProductName <<ValueObject>> {
+    - String value
+    + getValue(): String
+  }
+
+  class User <<Entity>> {
+    - UUID id
+    - String fullName
+    - String email
+    + getFullName(): String
+    + getEmail(): String
+  }
+
+  Order --> OrderItem : contains >
+  Order --> OrderStatus
+  Order --> User : placed by >
+  OrderItem --> Money
+  OrderItem --> Quantity
+  OrderItem --> ProductName
+}
+
+' =============================
+' APPLICATION LAYER
+' =============================
+
+
+package "Application Layer" {
+
+  interface PaymentGateway {
+    + processPayment(UUID orderId, Money amount, String paymentMethod): boolean
+    + refundPayment(UUID orderId): boolean
+    + validateCard(String cardNumber, String cvv, String expiryDate): boolean
+    + getPaymentStatus(UUID orderId): String
+  }
+
+  class OrderService {
+    - OrderRepository orderRepository
+    - PaymentGateway paymentGateway
+    + createOrder(User user, List<OrderItem> items): Order
+    + payOrder(UUID orderId): void
+    + cancelOrder(UUID orderId): void
+    + markOrderReady(UUID orderId): void
+  }
+
+  OrderService --> Order
+  OrderService --> OrderRepository
+  OrderService --> PaymentGateway
+}
+
+' =============================
+' INFRASTRUCTURE LAYER
+' =============================
+package "Infrastructure Layer" {
+
+  class OrderRepositoryImpl {
+    - Map<UUID, Order> database
+    + save(Order order): void
+    + findById(UUID id): Order
+    + update(Order order): void
+  }
+
+  class PaymentGatewayAdapter {
+    + processPayment(UUID orderId, Money amount, String paymentMethod): boolean
+    + refundPayment(UUID orderId): boolean
+    + validateCard(String cardNumber, String cvv, String expiryDate): boolean
+    + getPaymentStatus(UUID orderId): String
+  }
+
+  OrderRepositoryImpl ..|> OrderRepository
+  PaymentGatewayAdapter ..|> PaymentGateway
+}
+
+' =============================
+' INTERFACE LAYER
+' =============================
+package "Interface Layer" {
+
+  class OrderController {
+    - OrderService orderService
+    + postOrder(User user, List<OrderItem> items): Order
+    + payOrder(UUID orderId): void
+    + cancelOrder(UUID orderId): void
+    + markReady(UUID orderId): void
+  }
+
+  OrderController --> OrderService
+}
+@enduml

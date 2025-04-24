@@ -1,0 +1,129 @@
+@startuml
+
+' =============================
+' DOMAIN LAYER
+' =============================
+class Money <<ValueObject>> {
+  - BigDecimal amount
+  - Currency currency
+  + BigDecimal getAmount()
+  + Currency getCurrency()
+  + Money add(Money other)
+  + Money subtract(Money other)
+  + Money multiply(double multiplier)
+}
+
+package "Domain Layer" {
+    enum PaymentStatus {
+        PENDING,
+        COMPLETED,
+        FAILED,
+        REFUNDED
+    }
+
+  class Payment <<Entity>> {
+    - UUID id
+    - Money amount
+    - PaymentStatus status;
+
+    + getStatus(): PaymentStatus
+    + getAmount(): Money
+  }
+
+  interface PaymentProcessor {
+    + processPayment(Payment payment): boolean
+    + refundPayment(Payment payment): boolean
+  }
+
+  class PaymentEvent <<DomainEvent>> {
+    - UUID paymentId
+    - String eventType
+    - Date timestamp
+    - String details
+  }
+
+  class Invoice {
+    - UUID id
+    - Payment payment
+    - String invoiceNumber
+    - Date issuedAt
+  }
+
+  class PaymentRetryPolicy {
+    + shouldRetry(Payment payment): boolean
+    + getNextRetryDelay(Payment payment): Duration
+  }
+
+  class PaymentSpecification {
+    + isSatisfiedBy(Payment payment): boolean
+  }
+
+  Payment --> Money
+  Payment --> PaymentEvent
+  Payment --> Invoice
+}
+
+' =============================
+' APPLICATION LAYER
+' =============================
+
+package "Application Layer" {
+
+  class PaymentService {
+    - PaymentProcessorFactory processorFactory
+    + makePayment(Payment payment): boolean
+    + issueRefund(Payment payment): boolean
+  }
+
+  class PaymentProcessorFactory {
+    + getProcessorFor(Payment payment): PaymentProcessor
+  }
+
+  PaymentService --> Payment
+  PaymentService --> PaymentProcessorFactory
+  PaymentService --> PaymentSpecification
+  PaymentService --> PaymentRetryPolicy
+}
+
+' =============================
+' INFRASTRUCTURE LAYER
+' =============================
+package "Infrastructure Layer" {
+
+  class StripePaymentAdapter {
+    - String stripeApiKey
+    + processPayment(Payment payment): boolean
+    + refundPayment(Payment payment): boolean
+  }
+
+  class "Stripe API" {
+    + createPaymentIntent(BigDecimal amount, String currency): String
+    + confirmPayment(String paymentIntentId): boolean
+  }
+
+  StripePaymentAdapter --> "Stripe API"
+  StripePaymentAdapter ..|> PaymentProcessor
+}
+
+' =============================
+' INTERFACE LAYER
+' =============================
+package "Interface Layer" {
+
+  class PaymentController {
+    - PaymentService paymentService
+    + pay(Payment payment): boolean
+    + refund(Payment payment): boolean
+  }
+
+  class AuthenticatedUser {
+    - UUID userId
+    - List<Role> roles
+    + hasRole(String role): boolean
+  }
+
+  PaymentController --> PaymentService
+  PaymentController --> AuthenticatedUser
+}
+
+@enduml

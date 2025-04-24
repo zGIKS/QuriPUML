@@ -1,0 +1,60 @@
+@startuml
+' =============================
+' SHARED KERNEL DATABASE SCHEMA
+' =============================
+
+entity "currencies" {
+  + code : CHAR(3) <<PK>> "ISO 4217"
+  --
+  name : VARCHAR(100)
+  symbol : VARCHAR(5)
+  decimal_places : SMALLINT <<DEFAULT 2>>
+  created_at : TIMESTAMP
+}
+
+entity "addresses" {
+  + id : UUID <<PK>>
+  --
+  street : VARCHAR(255)
+  city : VARCHAR(100)
+  state : VARCHAR(100)
+  zip_code : VARCHAR(20)
+  country : CHAR(2)
+  is_valid : BOOLEAN <<DEFAULT false>>
+  validated_at : TIMESTAMP
+}
+
+entity "notifications" {
+  + id : UUID <<PK>>
+  --
+  user_id : UUID
+  message : TEXT
+  type : ENUM('EMAIL','PUSH','SMS','IN_APP') <<NOT NULL>>
+  payload : JSON
+}
+
+' ENUMS
+enum NotificationType {
+  EMAIL
+  PUSH
+  SMS
+  IN_APP
+}
+
+' RELATIONSHIPS
+notifications --> NotificationType : "notification type"
+
+' DOCUMENTATION
+note right of currencies
+  Currency data used by Money VO.
+end note
+
+note right of addresses
+  Reusable address structure across domains.
+end note
+
+note right of notifications
+  Persisted domain event for communication.
+end note
+
+@enduml

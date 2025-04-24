@@ -1,0 +1,64 @@
+@startuml
+' =============================
+' DATABASE SCHEMA (Optimized)
+' =============================
+
+entity "fulfillments" {
+  + id : UUID <<PK>>
+  --
+  order_id : UUID <<FK>> "references orders(id)"
+  status : ENUM('PENDING','IN_PRODUCTION','PACKED','SHIPPED','DELIVERED','CANCELED')
+  started_at : DATETIME
+  completed_at : DATETIME
+  is_canceled : BOOLEAN
+  shipped_at : DATETIME
+  packed_at : DATETIME
+  created_at : DATETIME
+  updated_at : DATETIME
+}
+
+entity "orders" {
+  + id : UUID <<PK>>
+  --
+  ' Add other fields as needed
+  created_at : DATETIME
+  updated_at : DATETIME
+}
+
+' Optional enhancement for tracking status transitions
+entity "fulfillment_status_history" {
+  + id : UUID <<PK>>
+  --
+  fulfillment_id : UUID <<FK>> "references fulfillments(id)"
+  old_status : VARCHAR
+  new_status : VARCHAR
+  changed_at : DATETIME
+}
+
+' ENUM Definition for visual clarity
+enum FulfillmentStatus {
+  PENDING
+  IN_PRODUCTION
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELED
+}
+
+' Relationships
+fulfillments }|--|| orders : "belongs to"
+fulfillment_status_history }|--|| fulfillments : "logs changes in"
+
+note right of fulfillments
+  Tracks fulfillment lifecycle:
+  - current status
+  - timestamps for stages
+  - cancellation flag
+end note
+
+note right of fulfillment_status_history
+  Optional: Records each status transition.
+  Enables detailed tracking and auditing.
+end note
+
+@enduml

@@ -1,0 +1,75 @@
+@startuml
+' Definición del modelo de base de datos
+entity Design {
+  * id : UUID <<PK>>
+  --
+  name : String
+  description : String
+  ownerId : UUID
+  creationDate : Date
+  isPublic : boolean
+}
+
+entity Layer {
+  * id : UUID <<PK>>
+  --
+  designId : UUID <<FK>>
+  name : String
+  positionX : float
+  positionY : float
+  rotation : float
+  scale : float
+  zIndex : int
+  locked : boolean
+  type : String <<discriminator: Text, Image, Shape>>
+}
+
+entity TextLayer {
+  * layerId : UUID <<PK, FK>>
+  --
+  text : String
+  font : String
+  color : String
+  fontSize : float
+  alignment : String
+  bold : boolean
+  italic : boolean
+  underline : boolean
+}
+
+entity ImageLayer {
+  * layerId : UUID <<PK, FK>>
+  --
+  imageUrl : String
+  opacity : float
+  width : float
+  height : float
+  maintainAspectRatio : boolean
+}
+
+entity ShapeLayer {
+  * layerId : UUID <<PK, FK>>
+  --
+  shapeType : String
+  fillColor : String
+  borderColor : String
+  borderWidth : float
+  shapeId : String
+}
+
+entity Template {
+  * id : UUID <<PK>>
+  --
+  name : String
+  category : String
+  isPremium : boolean
+  designId : UUID <<FK>>
+}
+
+' Relaciones
+Design ||--o{ Layer : contains
+Layer ||--|| TextLayer
+Layer ||--|| ImageLayer
+Layer ||--|| ShapeLayer
+Template ||--|| Design : baseDesign
+@enduml

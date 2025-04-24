@@ -1,0 +1,84 @@
+@startuml
+' =============================
+' DATABASE SCHEMA (Unified & Improved)
+' =============================
+
+entity "users" {
+  + id : UUID <<PK>>
+  --
+  full_name : VARCHAR(255)
+  email : VARCHAR(255) <<UNIQUE>>
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "orders" {
+  + id : UUID <<PK>>
+  --
+  customer_id : UUID <<FK>> "references users(id)"
+  order_date : TIMESTAMP
+  status : ENUM('PENDING','PAID','CANCELLED','READY_FOR_PRODUCTION')
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "order_items" {
+  + id : UUID <<PK>>
+  --
+  order_id : UUID <<FK>> "references orders(id)"
+  product_name : VARCHAR(255)
+  quantity : INTEGER
+  unit_price_amount : DECIMAL(19,4)
+  unit_price_currency : VARCHAR(3)
+  created_at : TIMESTAMP
+}
+
+entity "payments" {
+  + id : UUID <<PK>>
+  --
+  order_id : UUID <<FK>> <<UNIQUE>> "references orders(id)"
+  amount : DECIMAL(19,4)
+  currency : VARCHAR(3)
+  payment_method : VARCHAR(50)
+  status : ENUM('PENDING','COMPLETED','FAILED','REFUNDED')
+  processed_at : TIMESTAMP
+  refunded_at : TIMESTAMP
+}
+
+' ENUM Definitions
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  READY_FOR_PRODUCTION
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+' Relationships
+orders }|--|| users : "belongs to"
+orders ||--o{ order_items : "contains"
+orders ||--o| payments : "has"
+
+' Notes for clarity
+note right of orders
+  Stores order metadata including
+  customer reference and status.
+end note
+
+note right of order_items
+  Contains items of each order with product
+  name, quantity, and unit price at time of order.
+end note
+
+note right of payments
+  Tracks payment transactions per order.
+  Each order may have only one payment record.
+end note
+
+@enduml
